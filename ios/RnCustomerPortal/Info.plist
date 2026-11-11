@@ -35,7 +35,21 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Location is used for live bus tracking features in the portal.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>telprompt</string>
+		<string>mailto</string>
+		<string>sms</string>
+		<string>smsto</string>
+		<string>maps</string>
+		<string>comgooglemaps</string>
+		<string>whatsapp</string>
+		<string>googlegmail</string>
+		<string>facetime</string>
+		<string>facetime-audio</string>
+	</array>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

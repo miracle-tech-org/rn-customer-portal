@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState, type ComponentType} f
 import {
   ActivityIndicator,
   BackHandler,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -10,8 +11,10 @@ import {
 } from 'react-native';
 import WebViewBase, {type WebViewNavigation} from 'react-native-webview';
 import type {
+  ShouldStartLoadRequest,
   WebViewErrorEvent,
   WebViewHttpErrorEvent,
+  WebViewOpenWindowEvent,
 } from 'react-native-webview/lib/WebViewTypes';
 import {
   MOBILE_USER_AGENT_ANDROID,
@@ -19,6 +22,10 @@ import {
   MOBILE_VIEWPORT_SCRIPT,
   PORTAL_URL,
 } from '../config/portal';
+import {
+  openExternalUrl,
+  shouldOpenInSystemApp,
+} from '../utils/openExternalUrl';
 
 type PortalWebViewProps = {
   url?: string;
@@ -34,7 +41,9 @@ type WebViewHandle = {
 const WebView = WebViewBase as unknown as ComponentType<Record<string, unknown>>;
 
 /**
- * Full-screen portrait WebView tuned for the mobile-only portal layout.
+ * Intercepts portal links that must leave the WebView:
+ * tel: → Phone dialer, mailto: → Mail, sms: → Messages, etc.
+ * Also handles window.open() used by portal ads / support actions.
  */
 export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
   const webViewRef = useRef<WebViewHandle | null>(null);
@@ -51,6 +60,58 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
   const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
   }, []);
+
+  const handleExternalNavigation = useCallback((targetUrl?: string | null) => {
+    if (!targetUrl) {
+      return false;
+    }
+
+    if (!shouldOpenInSystemApp(targetUrl)) {
+      return false;
+    }
+
+    void openExternalUrl(targetUrl);
+    return true;
+  }, []);
+
+  const onShouldStartLoadWithRequest = useCallback(
+    (request: ShouldStartLoadRequest) => {
+      const targetUrl = request.url;
+
+      // Keep main portal http(s) navigations inside the WebView.
+      if (!shouldOpenInSystemApp(targetUrl)) {
+        return true;
+      }
+
+      // tel:, mailto:, sms:, maps, etc. → native apps (Android + iOS)
+      void openExternalUrl(targetUrl);
+      return false;
+    },
+    [],
+  );
+
+  const onOpenWindow = useCallback(
+    (event: WebViewOpenWindowEvent) => {
+      const targetUrl = event.nativeEvent.targetUrl;
+      if (!targetUrl) {
+        return;
+      }
+
+      if (shouldOpenInSystemApp(targetUrl)) {
+        void openExternalUrl(targetUrl);
+        return;
+      }
+
+      // Portal ads / external https links opened via window.open(..., '_blank')
+      void Linking.openURL(targetUrl).catch(() => {
+        // Fallback: load inside the same WebView
+        webViewRef.current?.injectJavaScript(
+          `window.location.href = ${JSON.stringify(targetUrl)}; true;`,
+        );
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -91,9 +152,7 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
         style={styles.webview}
         userAgent={userAgent}
         applicationNameForUserAgent="CustomerPortalApp"
-        // iOS: prefer mobile content mode so pages don't render as desktop.
         contentMode="mobile"
-        // Keep scale locked to the phone width (mobile site fit).
         scalesPageToFit={false}
         setBuiltInZoomControls={false}
         setDisplayZoomControls={false}
@@ -106,7 +165,17 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
         automaticallyAdjustContentInsets={false}
         contentInsetAdjustmentBehavior="never"
         allowsFullscreenVideo={false}
-        onNavigationStateChange={handleNavigationStateChange}
+        // Required so window.open / target=_blank reach onOpenWindow (Android).
+        setSupportMultipleWindows
+        onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+        onOpenWindow={onOpenWindow}
+        onNavigationStateChange={(navState: WebViewNavigation) => {
+          handleNavigationStateChange(navState);
+          // Extra safety if a tel: navigation slips through on some Android builds.
+          if (handleExternalNavigation(navState.url)) {
+            webViewRef.current?.goBack();
+          }
+        }}
         onLoadStart={() => {
           setLoading(true);
           setErrorMessage(null);
@@ -136,12 +205,24 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
         javaScriptEnabled
         domStorageEnabled
         allowsBackForwardNavigationGestures
-        setSupportMultipleWindows={false}
         startInLoadingState
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        originWhitelist={[
+          'http://*',
+          'https://*',
+          'tel:*',
+          'telprompt:*',
+          'mailto:*',
+          'sms:*',
+          'smsto:*',
+          'geo:*',
+          'maps:*',
+          'whatsapp:*',
+          'intent:*',
+        ]}
       />
 
       {loading && !errorMessage ? (
