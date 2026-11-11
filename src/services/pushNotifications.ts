@@ -36,6 +36,7 @@ type MessagingFn = {
 };
 
 let messagingModule: MessagingFn | null | undefined;
+let loadError: unknown = null;
 let initialized = false;
 let lastToken: string | null = null;
 let tokenListener: PushTokenListener | null = null;
@@ -48,9 +49,18 @@ function getMessaging(): MessagingFn | null {
   }
 
   try {
+    // @react-native-firebase/app MUST be loaded before any other Firebase service.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    messagingModule = require('@react-native-firebase/messaging').default;
+    require('@react-native-firebase/app');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const messaging = require('@react-native-firebase/messaging').default;
+    if (!messaging) {
+      throw new Error('messaging.default is undefined');
+    }
+    messagingModule = messaging;
+    loadError = null;
   } catch (error) {
+    loadError = error;
     console.warn('[push] Firebase Messaging native module unavailable:', error);
     messagingModule = null;
   }
@@ -138,7 +148,11 @@ export async function initPushNotifications(): Promise<string | null> {
   const messaging = getMessaging();
   if (!messaging) {
     console.warn(
-      '[push] Skipping init — add google-services.json / GoogleService-Info.plist and rebuild.',
+      '[push] Skipping init — Firebase Messaging failed to load.',
+      'Check: 1) android/app/google-services.json exists with package com.velonav.customerportal',
+      '2) Full native rebuild after adding the file (npm run android)',
+      '3) Error detail:',
+      loadError,
     );
     return null;
   }

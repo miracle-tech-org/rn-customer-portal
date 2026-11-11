@@ -22,6 +22,8 @@ jest.mock('react-native-webview', () => {
   };
 });
 
+jest.mock('@react-native-firebase/app', () => ({__esModule: true}));
+
 jest.mock('@react-native-firebase/messaging', () => {
   const messaging = () => ({
     requestPermission: jest.fn(async () => 1),

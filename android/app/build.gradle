@@ -118,14 +118,23 @@ dependencies {
     }
 }
 
-// Apply only when Firebase config is present so local builds don't crash
-// before google-services.json is added. See android/app/google-services.json.example
-def googleServicesFile = file("google-services.json")
+// Google Services plugin (required for Firebase / FCM).
+// File must live at: android/app/google-services.json
+// and include client package_name matching applicationId: com.velonav.customerportal
+def googleServicesFile = file("${projectDir}/google-services.json")
 if (googleServicesFile.exists()) {
+    def gsContent = googleServicesFile.getText("UTF-8")
+    if (!gsContent.contains("\"package_name\": \"com.velonav.customerportal\"")) {
+        throw new GradleException(
+            "[push] android/app/google-services.json is missing package_name com.velonav.customerportal. " +
+            "Download the Android config for this exact package from Firebase Console."
+        )
+    }
     apply plugin: "com.google.gms.google-services"
+    logger.lifecycle("[push] Applied Google Services plugin using ${googleServicesFile}")
 } else {
     logger.warn(
-        "[push] Missing android/app/google-services.json — Firebase Messaging disabled for this build. " +
-        "Copy google-services.json.example → google-services.json after creating your Firebase Android app."
+        "[push] Missing ${googleServicesFile} — Firebase Messaging disabled for this build. " +
+        "Place google-services.json next to android/app/build.gradle then rebuild."
     )
 }
