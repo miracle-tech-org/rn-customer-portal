@@ -59,3 +59,36 @@ export const MOBILE_VIEWPORT_SCRIPT = `
   true;
 })();
 `;
+
+/**
+ * Navigate the Smart Bus portal SPA to a screen from a push deep link.
+ * Portal uses go('notif') for the Alerts / Notifications tab.
+ */
+export function buildPortalDeepLinkScript(deepLink: string): string {
+  const normalized = String(deepLink || 'alerts').toLowerCase();
+  const screen =
+    normalized === 'alerts' ||
+    normalized === 'notif' ||
+    normalized === 'notifications'
+      ? 'notif'
+      : normalized === 'support' || normalized === 'msgs' || normalized === 'messages'
+        ? 'msgs'
+        : normalized === 'track' || normalized === 'live'
+          ? 'track'
+          : normalized === 'home'
+            ? 'home'
+            : 'notif';
+
+  return `
+(function() {
+  try {
+    if (typeof go === 'function') {
+      go(${JSON.stringify(screen)});
+    } else if (typeof loadInbox === 'function') {
+      loadInbox();
+    }
+  } catch (e) {}
+  true;
+})();
+`;
+}

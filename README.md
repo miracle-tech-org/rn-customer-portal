@@ -85,12 +85,58 @@ export const PORTAL_URL = 'https://your-portal-url.example/mobile/app.php';
 - User: `user7340776318`
 - Pass: `123`
 
+## Push notifications (implemented)
+
+Push is wired with `@react-native-firebase/messaging`.
+
+### One-time Firebase files (required to receive real pushes)
+
+1. Create a Firebase project (see root `../push-notification.md`).
+2. Android: download `google-services.json` → place at:
+
+```text
+android/app/google-services.json
+```
+
+3. iOS: download `GoogleService-Info.plist` → place at:
+
+```text
+ios/RnCustomerPortal/GoogleService-Info.plist
+```
+
+   Then add it to the Xcode target if needed, enable **Push Notifications** + **Background Modes → Remote notifications**, upload APNs `.p8` key to Firebase.
+
+4. Rebuild:
+
+```bash
+npm run android
+# macOS:
+cd ios && pod install && cd .. && npm run ios
+```
+
+Without those files the app still opens the portal; push init is skipped/logged.
+
+### What the app does
+
+- Requests notification permission (Android 13+ / iOS)
+- Reads FCM device token and logs it
+- Injects token into the WebView and calls portal `sbtsSetFcmToken(token)` so registration uses the **login session cookie**
+- Registers against `POST https://sbtspro.velonav.in/api/fcm_register.php`
+- Android channel: **`sbts_alerts`** (high importance)
+- Foreground: alert dialog; background/killed: system tray
+- Tap notification → opens portal start URL `https://sbtspro.velonav.in/mobile/app.php`
+
+Example files: `android/app/google-services.json.example`, `ios/RnCustomerPortal/GoogleService-Info.plist.example`
+
 ## Coming next (planned)
 
-- Push notifications (Firebase / APNs)
-- Camera + barcode scanning bridge back to the portal
-- App icon + ad network
+- App icon
 - Play Store / App Store release builds
+
+## Out of scope
+
+- Barcode scanning / camera
+- Ad network integration
 
 ## Scripts
 

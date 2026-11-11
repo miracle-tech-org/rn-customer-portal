@@ -117,3 +117,15 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Apply only when Firebase config is present so local builds don't crash
+// before google-services.json is added. See android/app/google-services.json.example
+def googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply plugin: "com.google.gms.google-services"
+} else {
+    logger.warn(
+        "[push] Missing android/app/google-services.json — Firebase Messaging disabled for this build. " +
+        "Copy google-services.json.example → google-services.json after creating your Firebase Android app."
+    )
+}

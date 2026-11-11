@@ -5,12 +5,19 @@
  * @format
  */
 
+import {useEffect, useRef, useState} from 'react';
 import {StatusBar, StyleSheet, View} from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import {PortalWebView} from './src/components/PortalWebView';
+import {PortalWebView, type PortalWebViewHandle} from './src/components/PortalWebView';
+import {
+  initPushNotifications,
+  setPushOpenHandler,
+  setPushTokenListener,
+  teardownPushNotifications,
+} from './src/services/pushNotifications';
 
 function App() {
   return (
@@ -23,9 +30,29 @@ function App() {
 
 function AppContent() {
   const insets = useSafeAreaInsets();
+  const portalRef = useRef<PortalWebViewHandle>(null);
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
 
-  // Keep the WebView in the usable portrait area (below notch / above home bar)
-  // so the mobile portal width matches a normal phone browser viewport.
+  useEffect(() => {
+    setPushTokenListener(token => {
+      setFcmToken(token);
+      portalRef.current?.injectFcmToken(token);
+    });
+
+    setPushOpenHandler(() => {
+      // Spec: notification tap opens portal start URL.
+      portalRef.current?.openStartUrl();
+    });
+
+    void initPushNotifications();
+
+    return () => {
+      setPushTokenListener(null);
+      setPushOpenHandler(null);
+      teardownPushNotifications();
+    };
+  }, []);
+
   return (
     <View
       style={[
@@ -37,7 +64,7 @@ function AppContent() {
           paddingRight: insets.right,
         },
       ]}>
-      <PortalWebView />
+      <PortalWebView ref={portalRef} fcmToken={fcmToken} />
     </View>
   );
 }
