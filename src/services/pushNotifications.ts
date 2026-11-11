@@ -117,7 +117,13 @@ async function requestPermission(): Promise<boolean> {
 
 function publishToken(token: string) {
   lastToken = token;
-  console.log('[push] FCM token:', token);
+  // Easy to spot in Metro / Logcat / Xcode console
+  console.log('');
+  console.log('========== DEVICE FCM TOKEN ==========');
+  console.log(token);
+  console.log('======================================');
+  console.log('[push] Copy this token to Firebase Console → Messaging → Send test message');
+  console.log('');
   tokenListener?.(token);
 }
 

@@ -83,6 +83,8 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
       if (!token) {
         return;
       }
+      console.log('[push] Injecting FCM token into WebView (sbtsSetFcmToken)');
+      console.log('[push] FCM token:', token);
       webViewRef.current?.injectJavaScript(
         buildFcmBridgeScript(token, buildDeviceInfo()),
       );

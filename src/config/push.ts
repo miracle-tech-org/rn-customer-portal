@@ -49,6 +49,10 @@ export function buildFcmBridgeScript(token: string, deviceInfo: string): string 
 
   window.__RN_FCM_TOKEN__ = token;
   window.__RN_DEVICE_INFO__ = deviceInfo;
+  try {
+    console.log('[SBTS][push] Device FCM token:', token);
+    console.log('[SBTS][push] device_info:', deviceInfo);
+  } catch (e) {}
 
   // Android bridge expected by SBTSPush.init
   window.Android = window.Android || {};
