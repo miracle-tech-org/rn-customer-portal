@@ -1,0 +1,10 @@
+## Copy to local.properties on machines where auto-detect fails.
+## Prefer: npm run doctor:android  (writes local.properties for you)
+##
+## Windows example:
+## sdk.dir=C\:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+##
+## macOS example:
+## sdk.dir=/Users/YOUR_USER/Library/Android/sdk
+
+sdk.dir=C\:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk

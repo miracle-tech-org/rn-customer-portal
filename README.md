@@ -10,8 +10,10 @@ Cross-platform React Native app that wraps the existing customer portal in a Web
 
 - Node.js **22.13+**, **24.3+**, or **26+** (Node 25 may show engine warnings)
 - npm 9+
-- **Android:** Android Studio, JDK 17+, Android SDK / emulator or device
+- **Android:** Android Studio, JDK 17+, Android SDK, plus an emulator **or** a USB device
 - **iOS (macOS only):** Xcode 16+, CocoaPods
+
+> `npm run android` **cannot work** on a PC without the Android SDK. Use the machine where Android Studio is already installed.
 
 ## Quick start
 
@@ -20,13 +22,27 @@ cd rn-customer-portal
 npm install
 ```
 
-### Android
+### Android (PC with Android Studio)
+
+1. Confirm the SDK is installed (usually `%LOCALAPPDATA%\Android\Sdk`).
+2. Create an emulator in Android Studio → **Device Manager**, **or** plug in a phone with USB debugging.
+3. (Recommended once) set User env vars:
+   - `ANDROID_HOME` = your SDK path
+   - PATH includes `%ANDROID_HOME%\platform-tools` and `%ANDROID_HOME%\emulator`
+4. Open a **new** terminal:
 
 ```bash
-npm start
-# in another terminal
-npm run android
+npm run doctor:android   # auto-finds SDK + writes android/local.properties
+npm start                # terminal 1
+npm run android          # terminal 2 — also auto-writes local.properties
 ```
+
+`npm run android` now runs `scripts/run-android.js`, which:
+
+- finds the Android SDK
+- writes `android/local.properties`
+- adds `adb` / emulator to PATH for that run
+- then calls `react-native run-android`
 
 ### iOS (macOS)
 
@@ -44,12 +60,15 @@ npm run ios
 
 ```
 rn-customer-portal/
-├── App.tsx                          # App entry
+├── App.tsx
+├── scripts/
+│   ├── ensure-android-env.js   # SDK detect + local.properties
+│   └── run-android.js          # used by npm run android
 ├── src/
-│   ├── config/portal.ts             # Portal URL + app name
-│   └── components/PortalWebView.tsx # WebView shell
-├── android/                         # Native Android project
-└── ios/                             # Native iOS project
+│   ├── config/portal.ts
+│   └── components/PortalWebView.tsx
+├── android/
+└── ios/
 ```
 
 ## Change the portal URL
@@ -78,12 +97,23 @@ export const PORTAL_URL = 'https://your-portal-url.example/mobile/app.php';
 | Script | Description |
 |---|---|
 | `npm start` | Start Metro bundler |
-| `npm run android` | Build & run on Android |
+| `npm run android` | Auto-setup Android env, then build & run |
+| `npm run doctor:android` | Only check SDK / write `local.properties` |
+| `npm run android:raw` | Run RN CLI without the helper |
 | `npm run ios` | Build & run on iOS |
 | `npm run lint` | Run ESLint |
 | `npm test` | Run Jest tests |
 
+## Fixing the errors from your log
+
+| Log message | Meaning | Fix |
+|---|---|---|
+| `adb is not recognized` | Platform-Tools not on PATH | Install Platform-Tools; use PC with Android Studio; `npm run android` adds PATH automatically when SDK exists |
+| `No emulators found` | No AVD created | Android Studio → Device Manager → Create device |
+| `SDK location not found` | No `ANDROID_HOME` / `local.properties` | Run on the PC with SDK; `npm run doctor:android` writes `local.properties` |
+
 ## Notes
 
 - React Native project name must be a valid identifier (`RnCustomerPortal`); the folder is `rn-customer-portal`.
-- iOS builds require a Mac. Android can be built on this Windows machine.
+- `android/local.properties` is machine-specific and gitignored.
+- iOS builds require a Mac.
