@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState, type ComponentType} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type ComponentType} from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -13,7 +13,12 @@ import type {
   WebViewErrorEvent,
   WebViewHttpErrorEvent,
 } from 'react-native-webview/lib/WebViewTypes';
-import {PORTAL_URL} from '../config/portal';
+import {
+  MOBILE_USER_AGENT_ANDROID,
+  MOBILE_USER_AGENT_IOS,
+  MOBILE_VIEWPORT_SCRIPT,
+  PORTAL_URL,
+} from '../config/portal';
 
 type PortalWebViewProps = {
   url?: string;
@@ -22,22 +27,26 @@ type PortalWebViewProps = {
 type WebViewHandle = {
   goBack: () => void;
   reload: () => void;
+  injectJavaScript: (script: string) => void;
 };
 
 // react-native-webview typings lag React 19 / RN 0.88; cast keeps runtime API intact.
-const WebView = WebViewBase as unknown as ComponentType<Record<string, unknown>> & {
-  // used only for typing the ref below
-};
+const WebView = WebViewBase as unknown as ComponentType<Record<string, unknown>>;
 
 /**
- * Full-screen WebView that loads the customer portal.
- * Android hardware back navigates within the portal history first.
+ * Full-screen portrait WebView tuned for the mobile-only portal layout.
  */
 export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
   const webViewRef = useRef<WebViewHandle | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const userAgent = useMemo(
+    () =>
+      Platform.OS === 'ios' ? MOBILE_USER_AGENT_IOS : MOBILE_USER_AGENT_ANDROID,
+    [],
+  );
 
   const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setCanGoBack(navState.canGoBack);
@@ -64,6 +73,10 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
     return () => subscription.remove();
   }, [canGoBack]);
 
+  const applyMobileFit = useCallback(() => {
+    webViewRef.current?.injectJavaScript(MOBILE_VIEWPORT_SCRIPT);
+  }, []);
+
   const reload = useCallback(() => {
     setErrorMessage(null);
     setLoading(true);
@@ -76,12 +89,39 @@ export function PortalWebView({url = PORTAL_URL}: PortalWebViewProps) {
         ref={webViewRef}
         source={{uri: url}}
         style={styles.webview}
+        userAgent={userAgent}
+        applicationNameForUserAgent="CustomerPortalApp"
+        // iOS: prefer mobile content mode so pages don't render as desktop.
+        contentMode="mobile"
+        // Keep scale locked to the phone width (mobile site fit).
+        scalesPageToFit={false}
+        setBuiltInZoomControls={false}
+        setDisplayZoomControls={false}
+        bounces={false}
+        overScrollMode="never"
+        scrollEnabled
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        allowsFullscreenVideo={false}
         onNavigationStateChange={handleNavigationStateChange}
         onLoadStart={() => {
           setLoading(true);
           setErrorMessage(null);
         }}
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={() => {
+          setLoading(false);
+          applyMobileFit();
+        }}
+        onLoadProgress={({nativeEvent}: {nativeEvent: {progress: number}}) => {
+          if (nativeEvent.progress > 0.7) {
+            applyMobileFit();
+          }
+        }}
+        injectedJavaScript={MOBILE_VIEWPORT_SCRIPT}
+        injectedJavaScriptBeforeContentLoaded={MOBILE_VIEWPORT_SCRIPT}
         onError={(syntheticEvent: WebViewErrorEvent) => {
           const {nativeEvent} = syntheticEvent;
           setLoading(false);
@@ -130,6 +170,8 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
   },
   overlay: {
     ...StyleSheet.absoluteFill,

@@ -1,5 +1,6 @@
 /**
  * Customer Portal — React Native WebView wrapper
+ * Portrait-only shell that fills the phone screen for the mobile portal.
  *
  * @format
  */
@@ -23,6 +24,8 @@ function App() {
 function AppContent() {
   const insets = useSafeAreaInsets();
 
+  // Keep the WebView in the usable portrait area (below notch / above home bar)
+  // so the mobile portal width matches a normal phone browser viewport.
   return (
     <View
       style={[
@@ -30,6 +33,8 @@ function AppContent() {
         {
           paddingTop: insets.top,
           paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         },
       ]}>
       <PortalWebView />
@@ -40,6 +45,7 @@ function AppContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: '#FFFFFF',
   },
 });
