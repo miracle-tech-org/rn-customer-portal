@@ -1,72 +1,27 @@
 import {Alert, PermissionsAndroid, Platform} from 'react-native';
+import {
+  AuthorizationStatus,
+  getInitialNotification,
+  getMessaging,
+  getToken,
+  onMessage,
+  onNotificationOpenedApp,
+  onTokenRefresh,
+  registerDeviceForRemoteMessages,
+  requestPermission as requestMessagingPermission,
+  setBackgroundMessageHandler,
+  type RemoteMessage,
+} from '@react-native-firebase/messaging';
 import {PUSH_CHANNEL_ID, PUSH_CHANNEL_NAME} from '../config/push';
 
 export type PushTokenListener = (token: string) => void;
 export type PushOpenHandler = () => void;
 
-type RemoteMessage = {
-  messageId?: string;
-  notification?: {title?: string; body?: string} | null;
-  data?: Record<string, string | object | undefined> | null;
-};
-
-type MessagingFn = {
-  (): {
-    requestPermission: () => Promise<number>;
-    getToken: () => Promise<string>;
-    onTokenRefresh: (listener: (token: string) => void) => () => void;
-    onMessage: (
-      listener: (message: RemoteMessage) => void | Promise<void>,
-    ) => () => void;
-    onNotificationOpenedApp: (
-      listener: (message: RemoteMessage) => void,
-    ) => () => void;
-    getInitialNotification: () => Promise<RemoteMessage | null>;
-    registerDeviceForRemoteMessages: () => Promise<void>;
-    setBackgroundMessageHandler: (
-      handler: (message: RemoteMessage) => Promise<void>,
-    ) => void;
-  };
-  AuthorizationStatus: {
-    AUTHORIZED: number;
-    PROVISIONAL: number;
-    DENIED: number;
-    NOT_DETERMINED: number;
-  };
-};
-
-let messagingModule: MessagingFn | null | undefined;
-let loadError: unknown = null;
 let initialized = false;
 let lastToken: string | null = null;
 let tokenListener: PushTokenListener | null = null;
 let openHandler: PushOpenHandler | null = null;
 const unsubscribers: Array<() => void> = [];
-
-function getMessaging(): MessagingFn | null {
-  if (messagingModule !== undefined) {
-    return messagingModule;
-  }
-
-  try {
-    // @react-native-firebase/app MUST be loaded before any other Firebase service.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('@react-native-firebase/app');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const messaging = require('@react-native-firebase/messaging').default;
-    if (!messaging) {
-      throw new Error('messaging.default is undefined');
-    }
-    messagingModule = messaging;
-    loadError = null;
-  } catch (error) {
-    loadError = error;
-    console.warn('[push] Firebase Messaging native module unavailable:', error);
-    messagingModule = null;
-  }
-
-  return messagingModule ?? null;
-}
 
 export function setPushTokenListener(listener: PushTokenListener | null) {
   tokenListener = listener;
@@ -85,8 +40,11 @@ export function getLastFcmToken(): string | null {
 
 function handleNotificationOpen(remoteMessage?: RemoteMessage | null) {
   const type = remoteMessage?.data?.type;
-  console.log('[push] Notification opened', type ? `(type=${String(type)})` : '');
-  // Spec: tapping should open the app start URL (portal). Handler reloads/focuses WebView.
+  console.log(
+    '[push] Notification opened',
+    type ? `(type=${String(type)})` : '',
+  );
+  // Spec: tapping opens the portal start URL.
   openHandler?.();
 }
 
@@ -104,22 +62,18 @@ async function requestAndroidPostNotificationsPermission(): Promise<boolean> {
   return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-async function requestPermission(): Promise<boolean> {
-  const messaging = getMessaging();
-  if (!messaging) {
-    return false;
-  }
-
+async function ensurePermission(): Promise<boolean> {
   const androidOk = await requestAndroidPostNotificationsPermission();
   if (!androidOk) {
     console.warn('[push] Android POST_NOTIFICATIONS denied');
     return false;
   }
 
-  const authStatus = await messaging().requestPermission();
+  const messaging = getMessaging();
+  const authStatus = await requestMessagingPermission(messaging);
   const enabled =
-    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+    authStatus === AuthorizationStatus.AUTHORIZED ||
+    authStatus === AuthorizationStatus.PROVISIONAL;
 
   console.log('[push] Permission status:', authStatus, 'enabled=', enabled);
   return enabled;
@@ -127,65 +81,56 @@ async function requestPermission(): Promise<boolean> {
 
 function publishToken(token: string) {
   lastToken = token;
-  // Easy to spot in Metro / Logcat / Xcode console
   console.log('');
   console.log('========== DEVICE FCM TOKEN ==========');
   console.log(token);
   console.log('======================================');
-  console.log('[push] Copy this token to Firebase Console → Messaging → Send test message');
+  console.log(
+    '[push] Copy this token to Firebase Console → Messaging → Send test message',
+  );
   console.log('');
   tokenListener?.(token);
 }
 
 /**
  * Call once at app startup (after React mount).
+ * Uses RN Firebase v26+ modular API (no default export).
  */
 export async function initPushNotifications(): Promise<string | null> {
   if (initialized) {
     return lastToken;
   }
-
-  const messaging = getMessaging();
-  if (!messaging) {
-    console.warn(
-      '[push] Skipping init — Firebase Messaging failed to load.',
-      'Check: 1) android/app/google-services.json exists with package com.velonav.customerportal',
-      '2) Full native rebuild after adding the file (npm run android)',
-      '3) Error detail:',
-      loadError,
-    );
-    return null;
-  }
-
   initialized = true;
 
   try {
+    const messaging = getMessaging();
+
     console.log(
       `[push] Android channel expected: "${PUSH_CHANNEL_ID}" (${PUSH_CHANNEL_NAME})`,
     );
 
     if (Platform.OS === 'ios') {
-      await messaging().registerDeviceForRemoteMessages();
+      await registerDeviceForRemoteMessages(messaging);
     }
 
-    const allowed = await requestPermission();
+    const allowed = await ensurePermission();
     if (!allowed) {
       return null;
     }
 
-    const token = await messaging().getToken();
+    const token = await getToken(messaging);
     if (token) {
       publishToken(token);
     }
 
     unsubscribers.push(
-      messaging().onTokenRefresh((newToken: string) => {
+      onTokenRefresh(messaging, (newToken: string) => {
         publishToken(newToken);
       }),
     );
 
     unsubscribers.push(
-      messaging().onMessage(async (remoteMessage: RemoteMessage) => {
+      onMessage(messaging, async (remoteMessage: RemoteMessage) => {
         const title =
           remoteMessage.notification?.title ||
           (remoteMessage.data?.title as string) ||
@@ -208,12 +153,12 @@ export async function initPushNotifications(): Promise<string | null> {
     );
 
     unsubscribers.push(
-      messaging().onNotificationOpenedApp((remoteMessage: RemoteMessage) => {
+      onNotificationOpenedApp(messaging, (remoteMessage: RemoteMessage) => {
         handleNotificationOpen(remoteMessage);
       }),
     );
 
-    const initial = await messaging().getInitialNotification();
+    const initial = await getInitialNotification(messaging);
     if (initial) {
       setTimeout(() => handleNotificationOpen(initial), 500);
     }
@@ -237,13 +182,16 @@ export function teardownPushNotifications() {
   initialized = false;
 }
 
+/**
+ * Background/quit handler must be registered in index.js (outside React).
+ */
 export function registerBackgroundMessageHandler() {
-  const messaging = getMessaging();
-  if (!messaging) {
-    return;
+  try {
+    const messaging = getMessaging();
+    setBackgroundMessageHandler(messaging, async (remoteMessage: RemoteMessage) => {
+      console.log('[push] Background message:', remoteMessage?.messageId);
+    });
+  } catch (error) {
+    console.warn('[push] Failed to register background handler:', error);
   }
-
-  messaging().setBackgroundMessageHandler(async (remoteMessage: RemoteMessage) => {
-    console.log('[push] Background message:', remoteMessage?.messageId);
-  });
 }

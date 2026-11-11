@@ -22,26 +22,26 @@ jest.mock('react-native-webview', () => {
   };
 });
 
-jest.mock('@react-native-firebase/app', () => ({__esModule: true}));
-
 jest.mock('@react-native-firebase/messaging', () => {
-  const messaging = () => ({
-    requestPermission: jest.fn(async () => 1),
+  const messagingInstance = {};
+  return {
+    __esModule: true,
+    AuthorizationStatus: {
+      AUTHORIZED: 1,
+      PROVISIONAL: 2,
+      DENIED: 0,
+      NOT_DETERMINED: -1,
+    },
+    getMessaging: jest.fn(() => messagingInstance),
     getToken: jest.fn(async () => 'test-token'),
+    requestPermission: jest.fn(async () => 1),
+    registerDeviceForRemoteMessages: jest.fn(async () => undefined),
     onTokenRefresh: jest.fn(() => jest.fn()),
     onMessage: jest.fn(() => jest.fn()),
     onNotificationOpenedApp: jest.fn(() => jest.fn()),
     getInitialNotification: jest.fn(async () => null),
-    registerDeviceForRemoteMessages: jest.fn(async () => undefined),
     setBackgroundMessageHandler: jest.fn(),
-  });
-  messaging.AuthorizationStatus = {
-    AUTHORIZED: 1,
-    PROVISIONAL: 2,
-    DENIED: 0,
-    NOT_DETERMINED: -1,
   };
-  return {__esModule: true, default: messaging};
 });
 
 test('renders correctly', async () => {
