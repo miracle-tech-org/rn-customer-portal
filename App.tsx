@@ -5,12 +5,13 @@
  * @format
  */
 
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {StatusBar, StyleSheet, View} from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import {AppSplash} from './src/components/AppSplash';
 import {PortalWebView, type PortalWebViewHandle} from './src/components/PortalWebView';
 import {
   initPushNotifications,
@@ -19,10 +20,16 @@ import {
   teardownPushNotifications,
 } from './src/services/pushNotifications';
 
+const SPLASH_MIN_MS = 1800;
+
 function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#022751"
+        translucent={false}
+      />
       <AppContent />
     </SafeAreaProvider>
   );
@@ -32,6 +39,14 @@ function AppContent() {
   const insets = useSafeAreaInsets();
   const portalRef = useRef<PortalWebViewHandle>(null);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  const [minTimeDone, setMinTimeDone] = useState(false);
+  const showSplash = !(portalReady && minTimeDone);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinTimeDone(true), SPLASH_MIN_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     setPushTokenListener(token => {
@@ -53,27 +68,42 @@ function AppContent() {
     };
   }, []);
 
+  const onPortalReady = useCallback(() => {
+    setPortalReady(true);
+  }, []);
+
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-        },
-      ]}>
-      <PortalWebView ref={portalRef} fcmToken={fcmToken} />
+    <View style={styles.root}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+          },
+        ]}>
+        <PortalWebView
+          ref={portalRef}
+          fcmToken={fcmToken}
+          onReady={onPortalReady}
+        />
+      </View>
+      <AppSplash visible={showSplash} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#022751',
+  },
   container: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#022751',
   },
 });
 

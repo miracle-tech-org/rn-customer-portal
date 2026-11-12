@@ -41,6 +41,8 @@ type PortalWebViewProps = {
   url?: string;
   /** Latest FCM token from native Firebase Messaging */
   fcmToken?: string | null;
+  /** Fired once when the first portal page finishes loading (or errors). */
+  onReady?: () => void;
 };
 
 type WebViewHandle = {
@@ -64,12 +66,23 @@ const WebView = WebViewBase as unknown as ComponentType<Record<string, unknown>>
  * - FCM token bridge → portal sbtsSetFcmToken (session cookie registration)
  */
 export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>(
-  function PortalWebView({url = PORTAL_URL, fcmToken = null}, ref) {
+  function PortalWebView({url = PORTAL_URL, fcmToken = null, onReady}, ref) {
     const webViewRef = useRef<WebViewHandle | null>(null);
+    const readyNotifiedRef = useRef(false);
     const [canGoBack, setCanGoBack] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [initialReady, setInitialReady] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [sourceUrl, setSourceUrl] = useState(url);
+
+    const notifyReady = useCallback(() => {
+      if (readyNotifiedRef.current) {
+        return;
+      }
+      readyNotifiedRef.current = true;
+      setInitialReady(true);
+      onReady?.();
+    }, [onReady]);
 
     const userAgent = useMemo(
       () =>
@@ -244,10 +257,14 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
           onLoadEnd={() => {
             setLoading(false);
             afterPageReady();
+            notifyReady();
           }}
           onLoadProgress={({nativeEvent}: {nativeEvent: {progress: number}}) => {
             if (nativeEvent.progress > 0.7) {
               afterPageReady();
+            }
+            if (nativeEvent.progress >= 1) {
+              notifyReady();
             }
           }}
           injectedJavaScript={beforeLoadScript}
@@ -256,17 +273,19 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
             const {nativeEvent} = syntheticEvent;
             setLoading(false);
             setErrorMessage(nativeEvent.description || 'Failed to load portal');
+            notifyReady();
           }}
           onHttpError={(syntheticEvent: WebViewHttpErrorEvent) => {
             const {nativeEvent} = syntheticEvent;
             if (nativeEvent.statusCode >= 400) {
               setErrorMessage(`Portal error (${nativeEvent.statusCode})`);
+              notifyReady();
             }
           }}
           javaScriptEnabled
           domStorageEnabled
           allowsBackForwardNavigationGestures
-          startInLoadingState
+          startInLoadingState={false}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
           sharedCookiesEnabled
@@ -286,7 +305,8 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
           ]}
         />
 
-        {loading && !errorMessage ? (
+        {/* Spinner only after splash has been dismissed (subsequent navigations). */}
+        {loading && !errorMessage && initialReady ? (
           <View style={styles.overlay} pointerEvents="none">
             <ActivityIndicator size="large" color="#1B6CA8" />
           </View>
@@ -309,12 +329,12 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#022751',
   },
   webview: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#022751',
   },
   overlay: {
     ...StyleSheet.absoluteFill,
