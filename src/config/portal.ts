@@ -4,7 +4,7 @@
  */
 export const PORTAL_URL = 'https://sbtspro.velonav.in/mobile/app.php';
 
-export const APP_DISPLAY_NAME = 'Customer Portal';
+export const APP_DISPLAY_NAME = 'SBTS Pro';
 
 /**
  * Force a phone user-agent so the portal always serves its mobile layout
