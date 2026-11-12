@@ -150,3 +150,9 @@ vite.config.ts.timestamp-*
 
 # Android local machine config (SDK path)
 android/local.properties
+
+# Production signing secrets (Play Store upload key)
+android/keystore.properties
+android/app/*.keystore
+!android/app/debug.keystore
+android/app/*.jks

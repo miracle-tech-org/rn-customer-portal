@@ -6,15 +6,20 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.2.0"
+        // Must match @react-native/gradle-plugin/gradle/libs.versions.toml (agp = 9.2.1)
+        agpVersion = "9.2.1"
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
+        // Pin AGP version explicitly. Versionless
+        //   classpath("com.android.tools.build:gradle")
+        // often fails to resolve → "Plugin with id 'com.android.application' not found".
+        classpath("com.android.tools.build:gradle:${agpVersion}")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
         classpath("com.google.gms:google-services:4.4.2")
     }
 }
