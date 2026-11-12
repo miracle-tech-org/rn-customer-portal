@@ -8,10 +8,11 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-# Required by React Native Firebase when using static frameworks.
-$RNFirebaseAsStaticFramework = true
-
-linkage = ENV['USE_FRAMEWORKS'] || 'static'
+# React Native Firebase (v22+) resolves firebase-ios-sdk via SPM.
+# SPM + static pod linkage is NOT supported (duplicate-symbol errors).
+# Keep dynamic frameworks. See: https://rnfirebase.io/#altering-cocoapods-to-use-frameworks
+# and https://rnfirebase.io/ios-spm
+linkage = ENV['USE_FRAMEWORKS'] || 'dynamic'
 Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
 use_frameworks! :linkage => linkage.to_sym
 
