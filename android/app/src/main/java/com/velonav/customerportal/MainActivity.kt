@@ -10,6 +10,9 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Switch from SplashTheme (windowBackground image) to the normal app theme
+    // before the React view is created, so the splash does not stick forever.
+    setTheme(R.style.AppTheme)
     // Portrait-only: mobile portal layout is not designed for landscape.
     requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     super.onCreate(savedInstanceState)
