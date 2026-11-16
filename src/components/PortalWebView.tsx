@@ -329,12 +329,12 @@ export const PortalWebView = forwardRef<PortalWebViewHandle, PortalWebViewProps>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#022751',
+    backgroundColor: '#FFFFFF',
   },
   webview: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#022751',
+    backgroundColor: '#FFFFFF',
   },
   overlay: {
     ...StyleSheet.absoluteFill,

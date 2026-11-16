@@ -78,8 +78,10 @@ function AppContent() {
         style={[
           styles.container,
           {
+            // Keep top inset for notch/status bar only.
+            // Do NOT pad the bottom — the portal already lays out its own
+            // bottom nav edge-to-edge (same as mobile browser).
             paddingTop: insets.top,
-            paddingBottom: insets.bottom,
             paddingLeft: insets.left,
             paddingRight: insets.right,
           },
@@ -98,12 +100,12 @@ function AppContent() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#022751',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#022751',
+    backgroundColor: '#FFFFFF',
   },
 });
 
